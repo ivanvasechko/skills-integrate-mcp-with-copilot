@@ -3,6 +3,28 @@ document.addEventListener("DOMContentLoaded", () => {
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
+  const loginForm = document.getElementById("login-form");
+  const logoutButton = document.getElementById("logout-button");
+  const loginMessage = document.getElementById("login-message");
+  const authStorageKey = "mergingtonTeacherAuth";
+
+  function getAuthHeaders() {
+    const auth = sessionStorage.getItem(authStorageKey);
+    return auth ? { Authorization: `Basic ${auth}` } : {};
+  }
+
+  function isTeacherAuthenticated() {
+    return sessionStorage.getItem(authStorageKey) !== null;
+  }
+
+  function updateLoginControls() {
+    const loggedIn = isTeacherAuthenticated();
+    loginForm.classList.toggle("hidden", loggedIn);
+    logoutButton.classList.toggle("hidden", !loggedIn);
+    document.querySelectorAll(".delete-btn").forEach((button) => {
+      button.classList.toggle("hidden", !loggedIn);
+    });
+  }
 
   // Function to fetch activities from API
   async function fetchActivities() {
@@ -30,7 +52,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 ${details.participants
                   .map(
                     (email) =>
-                      `<li><span class="participant-email">${email}</span><button class="delete-btn" data-activity="${name}" data-email="${email}">❌</button></li>`
+                      `<li><span class="participant-email">${email}</span><button class="delete-btn${
+                        isTeacherAuthenticated() ? "" : " hidden"
+                      }" data-activity="${name}" data-email="${email}">❌</button></li>`
                   )
                   .join("")}
               </ul>
@@ -80,6 +104,7 @@ document.addEventListener("DOMContentLoaded", () => {
         )}/unregister?email=${encodeURIComponent(email)}`,
         {
           method: "DELETE",
+          headers: getAuthHeaders(),
         }
       );
 
@@ -92,6 +117,10 @@ document.addEventListener("DOMContentLoaded", () => {
         // Refresh activities list to show updated participants
         fetchActivities();
       } else {
+        if (response.status === 401) {
+          sessionStorage.removeItem(authStorageKey);
+          updateLoginControls();
+        }
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
       }
@@ -110,6 +139,42 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
+    const credentials = btoa(`${username}:${password}`);
+
+    try {
+      const response = await fetch("/auth/login", {
+        headers: { Authorization: `Basic ${credentials}` },
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.detail || "Invalid teacher credentials");
+      }
+
+      sessionStorage.setItem(authStorageKey, credentials);
+      loginForm.reset();
+      loginMessage.textContent = `Logged in as ${result.username}`;
+      loginMessage.className = "success";
+      updateLoginControls();
+    } catch (error) {
+      loginMessage.textContent = error.message;
+      loginMessage.className = "error";
+    }
+    loginMessage.classList.remove("hidden");
+  });
+
+  logoutButton.addEventListener("click", () => {
+    sessionStorage.removeItem(authStorageKey);
+    loginMessage.textContent = "Logged out";
+    loginMessage.className = "success";
+    loginMessage.classList.remove("hidden");
+    updateLoginControls();
+  });
+
   // Handle form submission
   signupForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -124,6 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
         )}/signup?email=${encodeURIComponent(email)}`,
         {
           method: "POST",
+          headers: getAuthHeaders(),
         }
       );
 
@@ -137,6 +203,10 @@ document.addEventListener("DOMContentLoaded", () => {
         // Refresh activities list to show updated participants
         fetchActivities();
       } else {
+        if (response.status === 401) {
+          sessionStorage.removeItem(authStorageKey);
+          updateLoginControls();
+        }
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
       }
@@ -156,5 +226,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Initialize app
+  updateLoginControls();
   fetchActivities();
 });

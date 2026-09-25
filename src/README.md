@@ -25,6 +25,10 @@ A super simple FastAPI application that allows students to view and sign up for 
    - API documentation: http://localhost:8000/docs
    - Alternative documentation: http://localhost:8000/redoc
 
+The demo teacher account is `teacher` with password `mergington-teacher`. Only
+authenticated teachers can sign up or unregister students; activity listings
+remain publicly viewable.
+
 ## API Endpoints
 
 | Method | Endpoint                                                          | Description                                                         |
